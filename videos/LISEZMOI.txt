@@ -1,0 +1,18 @@
+VIDÉOS DE LA PAGE D'ACCUEIL
+===========================
+
+Déposez ici vos reels, nommés exactement :
+   accueil-1.mp4
+   accueil-2.mp4
+   accueil-3.mp4   (… jusqu'à accueil-6.mp4)
+
+Elles passent l'une après l'autre en boucle, sans le son (un bouton permet de l'activer).
+Sans aucune vidéo, la photo reste affichée.
+
+Conseils pour un site rapide :
+ - format MP4, vertical (comme vos reels) ;
+ - 10 à 30 secondes chacune ;
+ - moins de 4 Mo par vidéo (un reel brut fait souvent 20 à 50 Mo : il faut le compresser).
+ - 2 ou 3 vidéos suffisent.
+
+Pour remplacer une vidéo : remplacez simplement le fichier, en gardant le même nom.

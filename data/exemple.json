@@ -1,0 +1,83 @@
+{
+  "stages": [
+    {
+      "periode": "Stage de Noël",
+      "theme": "Le cadeau de Noël pour leur avenir !",
+      "ages": "Dès 8 ans",
+      "horaires": "13h00 – 16h00",
+      "lieu": "6 rue de la Tour, Thionville",
+      "prix": "185",
+      "prixJour": "50",
+      "places": 10,
+      "programme": [
+        "Lundi : Minecraft",
+        "Mardi : Minecraft",
+        "Mercredi : GDevelop",
+        "Jeudi : Robotique & anglais technique"
+      ],
+      "image": "images/stages/techweek-noel-2026.jpg",
+      "description": "Le vendredi : remise des diplômes et présentation des projets aux parents !",
+      "id": "NOEL26-S1",
+      "titre": "TechWeek — Semaine 1",
+      "dateDebut": "2026-12-21",
+      "dateFin": "2026-12-24",
+      "restantes": 10
+    },
+    {
+      "periode": "Stage de Noël",
+      "theme": "Le cadeau de Noël pour leur avenir !",
+      "ages": "Dès 8 ans",
+      "horaires": "13h00 – 16h00",
+      "lieu": "6 rue de la Tour, Thionville",
+      "prix": "185",
+      "prixJour": "50",
+      "places": 10,
+      "programme": [
+        "Lundi : Minecraft",
+        "Mardi : Minecraft",
+        "Mercredi : GDevelop",
+        "Jeudi : Robotique & anglais technique"
+      ],
+      "image": "images/stages/techweek-noel-2026.jpg",
+      "description": "Le vendredi : remise des diplômes et présentation des projets aux parents !",
+      "id": "NOEL26-S2",
+      "titre": "TechWeek — Semaine 2",
+      "dateDebut": "2026-12-28",
+      "dateFin": "2026-12-31",
+      "restantes": 10
+    }
+  ],
+  "albums": [
+    {
+      "nom": "Remise des diplômes 2026",
+      "categorie": "Diplômes",
+      "date": "Juin 2026",
+      "cover": "images/diplome-1.jpg",
+      "items": [
+        {
+          "type": "image",
+          "thumb": "images/diplome-1.jpg",
+          "full": "images/diplome-1.jpg"
+        },
+        {
+          "type": "image",
+          "thumb": "images/diplome-2.jpg",
+          "full": "images/diplome-2.jpg"
+        }
+      ]
+    },
+    {
+      "nom": "En cours à Thionville",
+      "categorie": "Cours à l'année",
+      "date": "2026",
+      "cover": "images/classe.jpg",
+      "items": [
+        {
+          "type": "image",
+          "thumb": "images/classe.jpg",
+          "full": "images/classe.jpg"
+        }
+      ]
+    }
+  ]
+}

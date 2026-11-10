@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://codinghost.fr/sitemap.xml
