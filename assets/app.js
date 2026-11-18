@@ -301,7 +301,10 @@
         const r = await fetch(CFG.API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
         const d = await r.json();
         if (!d.ok) throw new Error(d.error || "Erreur");
-        payUrl = d.payUrl; rib = d.virement; ref = d.ref || "";
+        // Si le script en ligne renvoie encore un lien d'exemple (ancienne version), on prend le vrai lien Stripe
+        if (d.payUrl && !/LIEN-|sumup/i.test(d.payUrl)) payUrl = d.payUrl;
+        else if (payUrl && /stripe\.com/.test(payUrl)) payUrl += "?prefilled_email=" + encodeURIComponent(payload.email) + (d.ref ? "&client_reference_id=" + d.ref : "");
+        rib = d.virement; ref = d.ref || "";
       } else {
         // Mode exemple (pas encore relié à Google) : on prépare un email à l'école
         const lines = [`Stage : ${s.periode} — ${s.titre} (${dateRange(s.dateDebut, s.dateFin)})`, `Formule : ${formule === "semaine" ? "semaine complète" : jours.map(dayLabel).join(", ")}`, `Montant : ${montant} €`, `Paiement : ${modePaiement}`, `Enfant : ${payload.enfant} (${payload.age} ans)`, `Parent : ${payload.parent}`, `Téléphone : ${payload.telephone}`, `Email : ${payload.email}`, `Remarques : ${payload.remarques}`, `Droit à l'image : ${payload.droitImage}`];

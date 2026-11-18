@@ -51,6 +51,7 @@ const REGLAGES = {
 };
 // ────────────────────────────────────
 
+const VERSION = '2026-11-18'; // pour vérifier quelle version est en ligne : adresse du script + ?action=version
 const ONGLET_STAGES = 'Stages';
 const ONGLET_RESA = 'Réservations';
 const ONGLET_CONTACT = 'Contacts';
@@ -67,6 +68,7 @@ const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 /* ═════════ API (appelée par le site) ═════════ */
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || 'all';
+  if (action === 'version') return json_({ version: VERSION, paiement: Object.keys(REGLAGES.LIENS_PAIEMENT || {}).map((k) => k + ' €'), virement: !!REGLAGES.VIREMENT_ACTIF });
   try {
     const out = {};
     if (action === 'all' || action === 'stages') out.stages = lireStages_();
@@ -234,7 +236,7 @@ function reserver_(d) {
             : payUrl ? `Pour la confirmer, merci de régler ${montant} € par carte ici (paiement sécurisé Stripe) :\n${payUrl}\n\n` : `Nous vous envoyons très vite le lien de paiement de ${montant} €.\n\n`) +
           `À très vite,\nL'équipe ${REGLAGES.NOM_ECOLE}\n${REGLAGES.TELEPHONE} · ${REGLAGES.ADRESSE}`
       });
-    } catch (mailErr) { console.warn(mailErr); }
+    } catch (mailErr) { console.error('❌ Email de réservation NON envoyé : ' + mailErr); }
 
     return { ok: true, payUrl: payUrl || '', montant: montant, ref: ref, virement: virement ? R : null };
   } finally {
@@ -272,7 +274,7 @@ function essai_(d) {
       subject: `Votre cours d'essai gratuit — ${d.cours}`,
       body: `Bonjour ${d.nom},\n\nMerci pour votre demande de cours d'essai gratuit !\n\nCours : ${d.cours}${d.enfant ? '\nÉlève : ' + qui : ''}\nDate souhaitée : ${d.dateTexte}${d.creneau && d.creneau !== 'À convenir' ? ' (' + d.creneau + ')' : ''}\nAdresse : ${REGLAGES.ADRESSE}\n\nNous vous appelons sous 24h pour confirmer.\n\nÀ très vite,\nL'équipe ${REGLAGES.NOM_ECOLE}\n${REGLAGES.TELEPHONE}`
     });
-  } catch (err) { console.warn(err); }
+  } catch (err) { console.error('❌ Email d\'essai NON envoyé : ' + err); }
   return { ok: true };
 }
 
@@ -290,7 +292,7 @@ function contact_(d) {
   feuille_(ONGLET_CONTACT, ENTETES_CONTACT).appendRow([new Date(), propre_(d.nom), propre_(d.email), "'" + String(d.telephone || '').slice(0, 30), propre_(d.cours), propre_(d.message)]);
   try {
     MailApp.sendEmail({ to: REGLAGES.EMAIL_ECOLE, replyTo: d.email, subject: `✉️ Message du site : ${d.nom} (${d.cours || 'contact'})`, body: `Nom : ${d.nom}\nEmail : ${d.email}\nTél : ${d.telephone}\nIntérêt : ${d.cours}\n\n${d.message}` });
-  } catch (_) {}
+  } catch (err) { console.error('❌ Email de contact NON envoyé : ' + err); }
   return { ok: true };
 }
 
@@ -520,6 +522,21 @@ function onOpen() {
     .addToUi();
 }
 function onEdit() { CacheService.getScriptCache().remove('stages'); }
+/** À lancer depuis l'éditeur (▷ Exécuter) : envoie un email de test et dit ce qui bloque. */
+function testerEmails() {
+  const moi = Session.getEffectiveUser().getEmail();
+  const reste = MailApp.getRemainingDailyQuota();
+  console.log('Script exécuté par le compte : ' + moi);
+  console.log('Emails encore autorisés aujourd\'hui : ' + reste);
+  console.log('Adresse de l\'école (EMAIL_ECOLE) : ' + REGLAGES.EMAIL_ECOLE);
+  if (reste < 1) { console.error('❌ Quota d\'emails du jour épuisé (Google limite à 100/jour pour un compte Gmail). Réessayez demain.'); return; }
+  MailApp.sendEmail({ to: REGLAGES.EMAIL_ECOLE, name: REGLAGES.NOM_ECOLE, subject: '✅ Test : les emails du site fonctionnent',
+    body: 'Si vous lisez ce message, le site peut vous envoyer les réservations, les demandes d\'essai et le récapitulatif du matin.\n\nVersion du script : ' + VERSION });
+  console.log('✅ Email de test envoyé à ' + REGLAGES.EMAIL_ECOLE + '. Regardez la boîte de réception, le dossier Spam' + (moi.toLowerCase() === String(REGLAGES.EMAIL_ECOLE).toLowerCase() ? ' et « Messages envoyés » (vous vous écrivez à vous-même).' : '.'));
+  const rappel = ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'rappelQuotidien');
+  console.log(rappel ? '✅ Le récapitulatif du matin est activé.' : '⚠️ Le récapitulatif du matin n\'est PAS activé : lancez la fonction activerRappelQuotidien.');
+}
+
 function recapMaintenant() { rappelQuotidien(true); }
 function viderCacheStages() { CacheService.getScriptCache().remove('stages'); SpreadsheetApp.getActive().toast('Les stages sont à jour sur le site.'); }
 function rafraichirGalerieMenu() { const a = rafraichirGalerie(); SpreadsheetApp.getActive().toast(a.length + ' albums publiés sur le site.'); }
