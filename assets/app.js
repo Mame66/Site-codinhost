@@ -98,7 +98,9 @@
   function loadData(action, cb) {
     const key = "ch_" + action, cached = CFG.API_URL ? store.get(key) : null;
     let shown = null;
-    if (cached && cached.d && Date.now() - cached.t < 7 * 864e5) { shown = JSON.stringify(cached.d); cb(cached.d); }
+    // Affichage immédiat de la version gardée en mémoire — APRÈS le chargement complet du script
+    // (sinon la fenêtre de réservation n'existe pas encore : c'était la cause des boutons « Réserver » bloqués)
+    if (cached && cached.d && Date.now() - cached.t < 7 * 864e5) { shown = JSON.stringify(cached.d); setTimeout(() => cb(cached.d), 0); }
     fetchAction(action).then((d) => { if (JSON.stringify(d) !== shown) cb(d); })
       .catch((err) => { console.warn("Google ne répond pas :", err); if (!shown) fetch("data/exemple.json").then((r) => r.json()).then((d) => cb({ ...d, demo: true })).catch(() => cb({ stages: [], albums: [] })); });
   }
@@ -251,7 +253,10 @@
     setTimeout(() => f.enfant.focus(), 50);
   }
   function closeModal() { modal.classList.remove("open"); document.body.style.overflow = ""; }
-  function openFromHash() { const m = location.hash.match(/^#reserver-(.+)$/); if (m) openBooking(decodeURIComponent(m[1])); }
+  function openFromHash() {
+    const m = location.hash.match(/^#reserver-(.+)$/);
+    if (m) try { openBooking(decodeURIComponent(m[1])); } catch (err) { console.warn(err); }
+  }
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-book]");
     if (b) { if (modal) openBooking(b.dataset.book); else location.href = "stages.html#reserver-" + encodeURIComponent(b.dataset.book); }
