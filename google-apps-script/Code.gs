@@ -18,14 +18,25 @@ const REGLAGES = {
   // ID du dossier Drive « Galerie site » (la fin de l'adresse du dossier, après /folders/)
   DOSSIER_GALERIE_ID: '1mS2y9hEyyVlG07A2ACdz39xqro7Q67FP',
 
-  // Vos liens de paiement Stripe (« Payment Links », à créer une seule fois dans le tableau de bord Stripe,
-  // ils servent pour tous les stages). Un Payment Link a un montant fixe : il faut donc un lien par montant.
-  // Le site ajoute tout seul l'email du parent et la référence de la réservation au lien.
+  // Vos liens de paiement Stripe, rangés PAR MONTANT (un Payment Link Stripe a un montant fixe).
+  // Le site choisit tout seul le lien qui correspond au montant de la réservation,
+  // et y ajoute l'email du parent et la référence de la réservation.
+  // Pour un nouveau montant : créez le lien dans Stripe et ajoutez une ligne ici.
   LIENS_PAIEMENT: {
-    semaine: 'https://buy.stripe.com/LIEN-185',   // semaine complète (185 €)
-    '1': 'https://buy.stripe.com/LIEN-50',        // 1 journée (50 €)
-    '2': 'https://buy.stripe.com/LIEN-100',       // 2 journées (100 €)
-    '3': 'https://buy.stripe.com/LIEN-150'        // 3 journées (150 €)
+    '50':  'https://buy.stripe.com/cNi4gAdmzfKn9m371f4800q',   // 1 journée
+    '100': 'https://buy.stripe.com/14A9AUfuH2XBgOvbhv4800r',   // 2 journées
+    '185': 'https://buy.stripe.com/eVqeVegyLbu71TBadr4800t',   // semaine Stage de Noël
+    '199': 'https://buy.stripe.com/bJefZi96j69N9m399n4800s'    // semaine (tarif 199 €)
+    // '150': 'https://buy.stripe.com/...',                    // 3 journées : lien à créer
+  },
+
+  // Paiement par virement (le RIB est affiché au parent APRÈS sa réservation, et envoyé par email)
+  VIREMENT_ACTIF: true,
+  RIB: {
+    titulaire: 'CODING HOST',
+    iban: 'FR83 3000 2070 3400 0007 2134 A14',
+    bic: 'CRLYFRPP',
+    banque: 'LCL — Thionville'
   },
 
   // Qui reçoit les notifications de réservation / contact
@@ -47,8 +58,8 @@ const ONGLET_ESSAIS = 'Essais';
 const ENTETES_ESSAIS = ['Reçu le', 'Pour', 'Élève', 'Âge', 'Cours', 'Créneau', 'Date souhaitée', 'Parent / Nom', 'Téléphone', 'Email', 'Connu par', 'Message', 'Suivi', 'Notes'];
 const SUIVI_ESSAIS = ['À appeler', 'Confirmé', 'Venu', 'Inscrit ✅', 'Pas venu', 'Pas intéressé'];
 const PERIODES = ['Stage de la Toussaint', 'Stage de Noël', 'Stage d\'hiver', 'Stage de printemps', 'Stage d\'été'];
-const ENTETES_STAGES = ['ID', 'Publié', 'Période', 'Titre', 'Thème', 'Âges', 'Date début', 'Date fin', 'Horaires', 'Lieu', 'Prix semaine', 'Prix jour', 'Places', 'Programme', 'Image', 'Description', 'Lien paiement (si différent)'];
-const ENTETES_RESA = ['Reçue le', 'ID stage', 'Stage', 'Enfant', 'Âge', 'Parent', 'Téléphone', 'Email', 'Formule', 'Jours', 'Montant', 'Remarques', 'Droit à l\'image', 'Paiement', 'Codes jours', 'Réf. paiement'];
+const ENTETES_STAGES = ['ID', 'Publié', 'Période', 'Titre', 'Thème', 'Âges', 'Date début', 'Date fin', 'Horaires', 'Lieu', 'Prix semaine', 'Prix jour', 'Places', 'Programme', 'Image', 'Description', 'Lien paiement (si différent)', 'Lien paiement jour (si différent)'];
+const ENTETES_RESA = ['Reçue le', 'ID stage', 'Stage', 'Enfant', 'Âge', 'Parent', 'Téléphone', 'Email', 'Formule', 'Jours', 'Montant', 'Remarques', 'Droit à l\'image', 'Paiement', 'Codes jours', 'Réf. paiement', 'Mode de paiement'];
 const ENTETES_CONTACT = ['Reçu le', 'Nom', 'Email', 'Téléphone', 'Intérêt', 'Message'];
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
@@ -194,40 +205,50 @@ function reserver_(d) {
     sh.appendRow([new Date(), s.id, s.periode + ' — ' + s.titre, propre_(d.enfant), propre_(d.age), propre_(d.parent), "'" + String(d.telephone || '').slice(0, 30), propre_(d.email), semaine ? 'Semaine' : 'À la journée', libJours, montant || '', propre_(d.remarques), d.droitImage === 'OUI' ? 'OUI' : 'NON', 'En attente', jours.join(',')]);
     CacheService.getScriptCache().remove('stages');
 
-    // Référence de la réservation (retrouvable dans Stripe : « Client reference ID »)
+    // Référence de la réservation (= « Client reference ID » dans Stripe, ou libellé du virement)
     const ligne = sh.getLastRow();
     const ref = (s.id + '-' + ligne).replace(/[^\w-]/g, '');
-    if (sh.getRange(1, ENTETES_RESA.length).getValue() !== 'Réf. paiement') sh.getRange(1, ENTETES_RESA.length).setValue('Réf. paiement');
-    sh.getRange(ligne, ENTETES_RESA.length).setValue(ref);
-    const L = REGLAGES.LIENS_PAIEMENT || REGLAGES.LIENS_SUMUP || {};
-    let payUrl = semaine ? (lienStage_(s.id) || L.semaine) : L[String(jours.length)];
+    const virement = d.modePaiement === 'virement' && REGLAGES.VIREMENT_ACTIF;
+    const nCol = ENTETES_RESA.length; // colonnes « Réf. paiement » et « Mode de paiement » (ajoutées si absentes)
+    if (sh.getRange(1, nCol - 1).getValue() !== 'Réf. paiement') sh.getRange(1, nCol - 1).setValue('Réf. paiement');
+    if (sh.getRange(1, nCol).getValue() !== 'Mode de paiement') sh.getRange(1, nCol).setValue('Mode de paiement');
+    sh.getRange(ligne, nCol - 1, 1, 2).setValues([[ref, virement ? 'Virement' : 'Carte (Stripe)']]);
+    // Lien : 1) lien propre au stage (colonnes du Sheet) 2) sinon le lien Stripe de ce montant
+    const L = REGLAGES.LIENS_PAIEMENT || {};
+    let payUrl = virement ? '' : ((semaine ? lienStage_(s.id, 'semaine') : (jours.length === 1 ? lienStage_(s.id, 'jour') : '')) || L[String(montant)] || '');
     if (payUrl && /stripe\.com/.test(payUrl)) payUrl += (payUrl.indexOf('?') > -1 ? '&' : '?') + 'prefilled_email=' + encodeURIComponent(d.email) + '&client_reference_id=' + ref;
+    const R = REGLAGES.RIB || {};
+    const texteRib = `Titulaire : ${R.titulaire}\nIBAN : ${R.iban}\nBIC : ${R.bic}\nBanque : ${R.banque}\nMontant : ${montant} €\nLibellé du virement (important) : ${ref}`;
     const resume = `${s.periode} — ${s.titre}${s.theme ? ' (' + s.theme + ')' : ''}\nDates : ${libJours === 'Semaine complète' ? 'du ' + jourCourt_(s.dateDebut) + ' au ' + jourCourt_(s.dateFin) : libJours}\nHoraires : ${s.horaires}\nLieu : ${s.lieu || REGLAGES.ADRESSE}\nMontant : ${montant} €`;
     try {
       MailApp.sendEmail({
         to: REGLAGES.EMAIL_ECOLE, replyTo: d.email,
         subject: `🎟️ Réservation ${s.periode} : ${d.enfant} — ${libJours}`,
-        body: `${resume}\n\nEnfant : ${d.enfant} (${d.age} ans)\nParent : ${d.parent}\nTél : ${d.telephone}\nEmail : ${d.email}\nRemarques : ${d.remarques || '-'}\nDroit à l'image : ${d.droitImage}\n\nRéférence Stripe : ${ref}\n${payUrl ? 'Lien de paiement envoyé au parent.' : '⚠️ Pas de lien Stripe pour ce montant : créez un lien de ' + montant + ' € dans Stripe et envoyez-le au parent.'}\nPensez à passer la ligne en « Payé » dans le Google Sheet une fois le paiement reçu.`
+        body: `${resume}\n\nEnfant : ${d.enfant} (${d.age} ans)\nParent : ${d.parent}\nTél : ${d.telephone}\nEmail : ${d.email}\nRemarques : ${d.remarques || '-'}\nDroit à l'image : ${d.droitImage}\n\nRéférence : ${ref}\nMode de paiement : ${virement ? 'VIREMENT (vérifiez votre compte LCL, libellé ' + ref + ')' : 'carte (Stripe)'}\n${virement || payUrl ? '' : '⚠️ Pas de lien Stripe pour ' + montant + ' € : créez-le dans Stripe et envoyez-le au parent (ou ajoutez-le dans LIENS_PAIEMENT).'}\nPensez à passer la ligne en « Payé » dans le Google Sheet une fois le paiement reçu.`
       });
       if (REGLAGES.EMAIL_AU_PARENT) MailApp.sendEmail({
         to: d.email, replyTo: REGLAGES.EMAIL_ECOLE, name: REGLAGES.NOM_ECOLE,
         subject: `Votre réservation : ${s.periode} — ${s.titre}`,
         body: `Bonjour ${d.parent},\n\nMerci ! La place de ${d.enfant} est pré-réservée :\n\n${resume}\n\n` +
-          (payUrl ? `Pour la confirmer, merci de régler ${montant} € ici :\n${payUrl}\n\n` : `Nous vous envoyons très vite le lien de paiement de ${montant} €.\n\n`) +
+          (virement ? `Pour la confirmer, merci de faire un virement de ${montant} € sur notre compte :\n\n${texteRib}\n\nLa place est confirmée à réception du virement.\n\n`
+            : payUrl ? `Pour la confirmer, merci de régler ${montant} € par carte ici (paiement sécurisé Stripe) :\n${payUrl}\n\n` : `Nous vous envoyons très vite le lien de paiement de ${montant} €.\n\n`) +
           `À très vite,\nL'équipe ${REGLAGES.NOM_ECOLE}\n${REGLAGES.TELEPHONE} · ${REGLAGES.ADRESSE}`
       });
     } catch (mailErr) { console.warn(mailErr); }
 
-    return { ok: true, payUrl: payUrl || '', montant: montant };
+    return { ok: true, payUrl: payUrl || '', montant: montant, ref: ref, virement: virement ? R : null };
   } finally {
     lock.releaseLock();
   }
 }
 
-function lienStage_(id) {
+function lienStage_(id, type) {
   const sh = SpreadsheetApp.getActive().getSheetByName(ONGLET_STAGES);
   const v = sh.getDataRange().getValues(), h = v[0].map(String);
-  const iId = h.indexOf('ID'), iL = h.findIndex((x) => /^Lien (SumUp|paiement|Stripe)/i.test(x));
+  // Ajoute la colonne « Lien paiement jour » si elle n'existe pas encore
+  if (!h.some((x) => /^Lien .*jour/i.test(x))) { sh.getRange(1, h.length + 1).setValue('Lien paiement jour (si différent)'); h.push('Lien paiement jour (si différent)'); }
+  const iId = h.indexOf('ID');
+  const iL = h.findIndex((x) => /^Lien (SumUp|paiement|Stripe)/i.test(x) && (type === 'jour' ? /jour/i.test(x) : !/jour/i.test(x)));
   if (iL < 0) return '';
   const row = v.find((r) => String(r[iId]) === id);
   return row ? String(row[iL] || '') : '';
@@ -475,8 +496,8 @@ function rappelQuotidien(manuel) {
       prevus.map((e) => [jour(e['Date souhaitée']) === auj ? '<b>Aujourd\'hui</b>' : 'Demain', e['Créneau'], `${e['Élève'] || '-'}${e['Âge'] ? ' (' + e['Âge'] + ' ans)' : ''}`, e['Cours'], `${e['Parent / Nom']}<br>${tel(e['Téléphone'])}`, e['Suivi']]));
 
   if (resas.length) html += `<h3 style="margin:0;color:#e5484d">💳 ${resas.length} réservation(s) de stage non payée(s)</h3>` +
-    table(['Reçue il y a', 'Stage', 'Enfant', 'Jours', 'Montant', 'Parent', 'Téléphone'],
-      resas.map((r) => [depuis(r['Reçue le']), r['Stage'], r['Enfant'], r['Jours'], (r['Montant'] || '') + ' €', r['Parent'], tel(r['Téléphone'])])) +
+    table(['Reçue il y a', 'Stage', 'Enfant', 'Jours', 'Montant', 'Mode', 'Réf.', 'Parent', 'Téléphone'],
+      resas.map((r) => [depuis(r['Reçue le']), r['Stage'], r['Enfant'], r['Jours'], (r['Montant'] || '') + ' €', r['Mode de paiement'] || '-', r['Réf. paiement'] || '', r['Parent'], tel(r['Téléphone'])])) +
     `<p style="font-size:13px;color:#5b5e78;margin-top:-14px">Paiement reçu → mettez « Payé ». Le parent ne viendra pas → mettez « Annulé » (la place se libère sur le site).</p>`;
 
   html += `<p style="margin-top:10px"><a href="${ss.getUrl()}" style="background:#ffc23d;color:#0b0d1f;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:bold;display:inline-block">Ouvrir le Google Sheet</a></p></div>`;

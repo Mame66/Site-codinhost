@@ -94,12 +94,21 @@ Ajoutez une ligne dans l'onglet **Stages** (une ligne = une semaine de stage) :
 
 Le site est mis à jour en moins d'une minute.
 
-### Les liens de paiement Stripe (à faire une fois)
-Un « Payment Link » Stripe a un **montant fixe**. Dans votre tableau de bord Stripe → **Payment Links** → **+ Nouveau**,
-créez 4 liens, réutilisables pour tous les stages : **185 €** (semaine), **50 €** (1 jour), **100 €** (2 jours), **150 €** (3 jours).
-Collez-les dans `LIENS_PAIEMENT`, en haut du script (et dans `assets/config.js`).
-Le site envoie le parent vers le bon lien, avec **son email déjà rempli** et la **référence de la réservation**
-(colonne « Réf. paiement » du Sheet = « Client reference ID » dans Stripe) : vous retrouvez facilement qui a payé.
+### Paiement : carte (Stripe) ou virement
+Le parent choisit **Carte bancaire** ou **Virement** au moment de réserver.
+
+**Carte — liens Stripe rangés par montant.** Un « Payment Link » Stripe a un montant fixe. En haut du script,
+`LIENS_PAIEMENT` associe chaque montant à son lien (50 €, 100 €, 185 €, 199 €…). Le site choisit tout seul
+le lien du montant réservé, avec l'email du parent déjà rempli et la référence de la réservation
+(colonne « Réf. paiement » du Sheet = « Client reference ID » dans Stripe).
+Nouveau tarif ? Créez le lien dans Stripe et ajoutez une ligne dans `LIENS_PAIEMENT`.
+Un stage peut aussi avoir ses propres liens : colonnes « Lien paiement (si différent) » (semaine)
+et « Lien paiement jour (si différent) » (1 journée) de l'onglet Stages.
+Pas de lien pour un montant (ex. 3 jours = 150 €) → le parent est prévenu que vous lui enverrez le lien.
+
+**Virement.** Le RIB (réglage `RIB` du script) est affiché au parent juste après sa réservation et envoyé
+par email, avec la référence à mettre dans le libellé du virement. Colonne « Mode de paiement » = Virement :
+vérifiez votre compte, puis passez la ligne en « Payé ».
 
 ### Les vidéos de la page d'accueil
 Déposez vos reels dans le dossier `videos/` nommés `accueil-1.mp4`, `accueil-2.mp4`… (jusqu'à 6).

@@ -258,6 +258,15 @@
     if (e.target.closest("[data-close]") || e.target === modal) closeModal();
   });
 
+  document.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-copy]"); if (!c) return;
+    const el = $(`[data-rib="${c.dataset.copy}"]`), val = el ? el.textContent : "";
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(c.dataset.copy === "iban" ? val.replace(/\s+/g, "") : val).then(() => {
+      c.innerHTML = '<i class="bi bi-check-lg"></i>'; setTimeout(() => (c.innerHTML = '<i class="bi bi-copy"></i>'), 1500);
+    }).catch(() => {});
+  });
+
   const bookForm = $("#bookForm");
   bookForm && bookForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -270,38 +279,50 @@
     if (formule === "jours" && !jours.length) { msg.className = "form-msg err"; msg.textContent = "Choisissez au moins un jour."; return; }
     if (formule === "jours" && jours.length === all.length) formule = "semaine";
     const montant = formule === "semaine" ? Number(s.prix) : jours.length * Number(s.prixJour);
+    const modePaiement = (f.modePaiement && f.modePaiement.value) || "carte";
     const payload = {
-      type: "reservation", stageId: s.id, formule, jours,
+      type: "reservation", stageId: s.id, formule, jours, modePaiement,
       parent: f.parent.value.trim(), email: f.email.value.trim(), telephone: f.telephone.value.trim(),
       enfant: f.enfant.value.trim(), age: f.age.value.trim(), remarques: f.remarques.value.trim(),
       droitImage: f.droitImage.checked ? "OUI" : "NON"
     };
     btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Envoi…';
-    const L = CFG.LIENS_PAIEMENT || CFG.LIENS_SUMUP || {};
-    let payUrl = formule === "semaine" ? L.semaine : L[String(jours.length)];
+    // Lien Stripe choisi selon le montant (le Google Apps Script renvoie le bon lien ; ceci sert en mode exemple)
+    const L = CFG.LIENS_PAIEMENT || {};
+    let payUrl = modePaiement === "virement" ? "" : L[String(montant)] || "";
+    let rib = null, ref = "";
     try {
       if (CFG.API_URL) {
         const r = await fetch(CFG.API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
         const d = await r.json();
         if (!d.ok) throw new Error(d.error || "Erreur");
-        payUrl = d.payUrl;
+        payUrl = d.payUrl; rib = d.virement; ref = d.ref || "";
       } else {
         // Mode exemple (pas encore relié à Google) : on prépare un email à l'école
-        const lines = [`Stage : ${s.periode} — ${s.titre} (${dateRange(s.dateDebut, s.dateFin)})`, `Formule : ${formule === "semaine" ? "semaine complète" : jours.map(dayLabel).join(", ")}`, `Montant : ${montant} €`, `Enfant : ${payload.enfant} (${payload.age} ans)`, `Parent : ${payload.parent}`, `Téléphone : ${payload.telephone}`, `Email : ${payload.email}`, `Remarques : ${payload.remarques}`, `Droit à l'image : ${payload.droitImage}`];
+        const lines = [`Stage : ${s.periode} — ${s.titre} (${dateRange(s.dateDebut, s.dateFin)})`, `Formule : ${formule === "semaine" ? "semaine complète" : jours.map(dayLabel).join(", ")}`, `Montant : ${montant} €`, `Paiement : ${modePaiement}`, `Enfant : ${payload.enfant} (${payload.age} ans)`, `Parent : ${payload.parent}`, `Téléphone : ${payload.telephone}`, `Email : ${payload.email}`, `Remarques : ${payload.remarques}`, `Droit à l'image : ${payload.droitImage}`];
         window.open(`mailto:${CFG.EMAIL}?subject=${encodeURIComponent("Réservation " + (s.periode || "stage") + " – " + payload.enfant)}&body=${encodeURIComponent(lines.join("\n"))}`);
+        if (payUrl && /stripe\.com/.test(payUrl)) payUrl += (payUrl.includes("?") ? "&" : "?") + "prefilled_email=" + encodeURIComponent(payload.email);
       }
       f.hidden = true;
       $("#bookDone").hidden = false;
       $("#bookDoneName").textContent = payload.enfant;
-      $("#bookAmount").textContent = montant + " €";
-      const pay = $("#payLink");
-      if (payUrl && !CFG.API_URL && /stripe\.com/.test(payUrl)) payUrl += (payUrl.includes("?") ? "&" : "?") + "prefilled_email=" + encodeURIComponent(payload.email);
-      if (payUrl) { pay.hidden = false; pay.href = payUrl; $("#payLater").hidden = true; }
-      else { pay.hidden = true; $("#payLater").hidden = false; }
+      const pay = $("#payLink"), ribBox = $("#ribBox"), sub = $("#bookDone .sub");
+      ribBox.hidden = true; pay.hidden = true; $("#payLater").hidden = true;
+      if (modePaiement === "virement") {
+        sub.innerHTML = `Dernière étape : faites un virement de <b>${montant} €</b> en indiquant le libellé ci-dessous. La place est confirmée à réception.`;
+        if (rib) {
+          const v = { titulaire: rib.titulaire, iban: rib.iban, bic: rib.bic, montant: montant + " €", ref };
+          $$("[data-rib]", ribBox).forEach((el) => (el.textContent = v[el.dataset.rib] || ""));
+          ribBox.hidden = false;
+        } else { $("#payLater").hidden = false; $("#payLater").textContent = "Nous vous envoyons notre RIB par email très rapidement."; }
+      } else {
+        sub.innerHTML = `Dernière étape : réglez <b>${montant} €</b> pour confirmer définitivement la place. Vous recevez aussi un récapitulatif par email.`;
+        if (payUrl) { pay.hidden = false; pay.href = payUrl; } else $("#payLater").hidden = false;
+      }
     } catch (err) {
       msg.className = "form-msg err";
       msg.textContent = /complet/i.test(err.message) ? "Désolé, un des jours choisis vient d'être complet. Rechargez la page ou contactez-nous." : "Oups, l'envoi n'a pas fonctionné. Réessayez ou appelez-nous au " + (CFG.TELEPHONE || "") + ".";
-    } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-lock"></i> Réserver et payer'; }
+    } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-lock"></i> Réserver'; }
   });
 
   /* ═══════════ GALERIE ═══════════ */
